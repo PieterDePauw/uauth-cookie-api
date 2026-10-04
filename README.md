@@ -70,6 +70,7 @@ pnpm build
 node --env-file=.env dist/cli.js otrs                  # prints the OTRSAgentInterface value
 node --env-file=.env dist/cli.js uc --format header    # prints OpenScapeUC=…
 node --env-file=.env dist/cli.js uc --format json --headful
+pnpm run cookie                                        # builds, loads .env, prints both as OTRSAgentInterface=… and OpenScapeUC=…
 ```
 
 ```

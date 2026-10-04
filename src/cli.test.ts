@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest"
 import { formatCookie, getExitCode, main } from "./cli.js"
+
+vi.mock("./get-cookie.js", () => ({
+	getOtrsCookie: vi.fn(async () => ({ name: "OTRSAgentInterface", value: "o", header: "OTRSAgentInterface=o" })),
+	getUcCookie: vi.fn(async () => ({ name: "OpenScapeUC", value: "u", header: "OpenScapeUC=u" })),
+}))
 import { CookieApiError, CookieTimeoutError, CredentialsRejectedError, MissingCredentialsError } from "./errors.js"
 import type { SessionCookie } from "./get-cookie.js"
 
@@ -28,7 +33,34 @@ describe("main", () => {
 	it("prints usage and fails on an unknown service", async () => {
 		const error = vi.spyOn(console, "error").mockImplementation(() => {})
 		expect(await main(["jira"])).toBe(1)
-		expect(error).toHaveBeenCalledWith(expect.stringContaining("Usage: uauth-cookie <otrs|uc>"))
+		expect(error).toHaveBeenCalledWith(expect.stringContaining("Usage: uauth-cookie [otrs|uc]"))
+		error.mockRestore()
+	})
+
+	it("prints one service's value by default", async () => {
+		const log = vi.spyOn(console, "log").mockImplementation(() => {})
+		expect(await main(["uc"])).toBe(0)
+		expect(log).toHaveBeenCalledWith("u")
+		log.mockRestore()
+	})
+
+	it("prints both cookies as headers without a service", async () => {
+		const log = vi.spyOn(console, "log").mockImplementation(() => {})
+		expect(await main([])).toBe(0)
+		expect(log).toHaveBeenCalledWith("OTRSAgentInterface=o\nOpenScapeUC=u")
+		log.mockRestore()
+	})
+
+	it("prints both cookies as one JSON object", async () => {
+		const log = vi.spyOn(console, "log").mockImplementation(() => {})
+		expect(await main(["--format", "json"])).toBe(0)
+		expect(JSON.parse(log.mock.calls[0]![0] as string)).toMatchObject({ otrs: { value: "o" }, uc: { value: "u" } })
+		log.mockRestore()
+	})
+
+	it("rejects --url without a service", async () => {
+		const error = vi.spyOn(console, "error").mockImplementation(() => {})
+		expect(await main(["--url", "https://x"])).toBe(1)
 		error.mockRestore()
 	})
 
