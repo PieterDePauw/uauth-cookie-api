@@ -1,0 +1,45 @@
+{
+	"name": "uauth-cookie-api",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Get the OTRSAgentInterface cookie from OTRS and the OpenScapeUC cookie from OpenScape UC, logging into Microsoft Entra ID (UGent) in a headless browser when needed.",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/PieterDePauw/uauth-cookie-api.git"
+	},
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"bin": {
+		"uauth-cookie": "./dist/cli.js"
+	},
+	"files": [
+		"dist",
+		"!dist/**/*.test.*"
+	],
+	"scripts": {
+		"browsers": "patchright install chromium",
+		"build": "tsc -p tsconfig.build.json",
+		"cookie": "node --run build && node ./dist/cli.js",
+		"prepack": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\" && node --run build",
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"patchright": "^1.63.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.18.0",
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.4"
+	},
+	"engines": {
+		"node": ">=22.18"
+	}
+}
