@@ -4,3 +4,5 @@ dist/
 .env
 coverage/
 *.tgz
+.uauth-profile
+.github

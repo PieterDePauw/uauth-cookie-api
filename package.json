@@ -26,7 +26,7 @@
 	"scripts": {
 		"browsers": "patchright install chromium",
 		"build": "tsc -p tsconfig.build.json",
-		"cookie": "node --run build && node ./dist/cli.js",
+		"cookie": "node --run build && node --env-file-if-exists=.env ./dist/cli.js",
 		"prepack": "node -e \"fs.rmSync('dist', { recursive: true, force: true })\" && node --run build",
 		"test": "vitest run",
 		"typecheck": "tsc --noEmit"
