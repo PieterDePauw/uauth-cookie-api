@@ -2,6 +2,7 @@ import type { BrowserContext, Page } from "patchright"
 import { openBrowser, type OpenBrowser } from "./browser.js"
 import { isMicrosoftLogin, signInWithEntra, type EntraCredentials } from "./entra.js"
 import { CookieTimeoutError, MissingCredentialsError } from "./errors.js"
+import type { JarCookie } from "./jar.js"
 import { DEFAULT_OTRS_URL, DEFAULT_UC_URL, otrsTarget, ucTarget, type PartialUcCredentials, type Target } from "./targets.js"
 
 /** Entra credentials as gathered from options; missing fields fall back to env. */
@@ -82,7 +83,23 @@ export function resolveUcCredentials(partial: PartialUcCredentials | undefined, 
 }
 
 /** Land on `target.url` signed in (via Entra if needed), run the target's hook, and return its session cookie. */
-export function getCookie(target: Target, options: CookieOptions = {}, dependencies: Dependencies = defaultDependencies): Promise<SessionCookie> {
+export async function getCookie(target: Target, options: CookieOptions = {}, dependencies: Dependencies = defaultDependencies): Promise<SessionCookie> {
+	return (await getSession(target, options, dependencies)).cookie
+}
+
+/** Everything a plain HTTP client needs to act as the browser on the service: the cookie, every cookie the browser holds for it, and its User-Agent. */
+export type BrowserSession = {
+	/** The service URL the session was obtained for (`target.url`). */
+	url: string
+	cookie: SessionCookie
+	/** All of the browser's cookies for `target.url` and `target.keepAliveUrl`, including the reverse proxy's own session cookie (mod_auth_openidc). */
+	jar: JarCookie[]
+	/** The browser's User-Agent, sent along so the service sees the same client. */
+	userAgent: string
+}
+
+/** Like `getCookie`, but also returns the browser's whole cookie jar for the service and its User-Agent. */
+export function getSession(target: Target, options: CookieOptions = {}, dependencies: Dependencies = defaultDependencies): Promise<BrowserSession> {
 	const env = options.env ?? process.env
 	const profileDir = resolveProfileDir(options, env)
 	// One Chromium per profile at a time: a second launch on the same dir fails on the profile lock.
@@ -90,7 +107,11 @@ export function getCookie(target: Target, options: CookieOptions = {}, dependenc
 		const deadline = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
 		const browser = await dependencies.open({ profileDir, headless: options.headless ?? true })
 		try {
-			return await readCookieSignedIn(browser, target, () => resolveEntraCredentials(options.entra, env), deadline, dependencies.signIn)
+			const cookie = await readCookieSignedIn(browser, target, () => resolveEntraCredentials(options.entra, env), deadline, dependencies.signIn)
+			const urls = [...new Set([target.url, target.keepAliveUrl ?? target.url])]
+			const jar = (await browser.context.cookies(urls)).map(({ name, value, domain, path, expires, httpOnly, secure }) => ({ name, value, domain, path, expires, httpOnly, secure }))
+			const userAgent = await browser.page.evaluate(() => navigator.userAgent)
+			return { url: target.url, cookie, jar, userAgent }
 		} finally {
 			await browser.close()
 		}

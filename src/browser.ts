@@ -42,5 +42,14 @@ export async function openBrowser({ profileDir, headless = true }: BrowserOption
 	})
 	await context.addInitScript(disablePasskeys)
 	const page = context.pages()[0] ?? (await context.newPage())
-	return { context, page, close: () => context.close().catch(() => undefined) }
+	return { context, page, close: () => closeQuietly(context) }
+}
+
+/**
+ * Close without letting the pages say goodbye: a web client may send a logout request (beacon, fetch) as it unloads, which would end the very session
+ * whose cookies we just handed out. Abort every request first, then close.
+ */
+async function closeQuietly(context: BrowserContext): Promise<void> {
+	await context.route("**/*", (route) => route.abort()).catch(() => undefined)
+	await context.close().catch(() => undefined)
 }

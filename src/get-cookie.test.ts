@@ -1,7 +1,7 @@
 import type { BrowserContext, Page } from "patchright"
 import { describe, expect, it, vi } from "vitest"
 import { CookieTimeoutError, MissingCredentialsError } from "./errors.js"
-import { getCookie, getOtrsCookie, resolveEntraCredentials, runExclusive, waitForSsoBounce, type Dependencies } from "./get-cookie.js"
+import { getCookie, getOtrsCookie, getSession, resolveEntraCredentials, runExclusive, waitForSsoBounce, type Dependencies } from "./get-cookie.js"
 import { otrsTarget } from "./targets.js"
 
 const OTRS = "https://otrsdict.ugent.be/znuny/index.pl"
@@ -24,6 +24,7 @@ function createFakeBrowser({ urlsAfterGoto, cookies, cookiesReady = () => true }
 			current = pending.shift() ?? current
 		}),
 		waitForLoadState: vi.fn(async () => undefined),
+		evaluate: vi.fn(async () => "Mozilla/5.0 Test"),
 		setUrl: (url: string) => {
 			current = url
 			pending = []
@@ -86,6 +87,19 @@ describe("getCookie", () => {
 		}
 		const cookie = await getCookie(target, { env: {}, profileDir: "p5", timeoutMs: 0 }, { open: fake.open, signIn: vi.fn() } as Dependencies)
 		expect(cookie.name).toBe("OpenScapeUC")
+	})
+})
+
+describe("getSession", () => {
+	it("also returns the browser's cookie jar for the service and its User-Agent", async () => {
+		const proxy: FakeCookie = { ...otrsCookie, name: "mod_auth_openidc_session", value: "oidc", path: "/" }
+		const fake = createFakeBrowser({ urlsAfterGoto: [OTRS], cookies: [otrsCookie, proxy] })
+		const session = await getSession(otrsTarget(), { env: {}, profileDir: "p7" }, { open: fake.open, signIn: vi.fn() } as Dependencies)
+		expect(session.url).toBe(OTRS)
+		expect(session.userAgent).toBe("Mozilla/5.0 Test")
+		expect(session.jar.map((cookie) => cookie.name)).toEqual(["OTRSAgentInterface", "mod_auth_openidc_session"])
+		expect(session.jar[0]).not.toHaveProperty("sameSite")
+		expect(fake.context.cookies).toHaveBeenLastCalledWith([OTRS])
 	})
 })
 
