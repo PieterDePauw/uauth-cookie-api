@@ -47,16 +47,23 @@ export type SessionCookie = {
 	signedIn: boolean
 }
 
+/** What `getOtrsCookie` returns: the cookie plus the header OTRS accepts the same session ID in. */
+export type OtrsSessionCookie = SessionCookie & {
+	/** `{ "X-OTRS-Header-SessionID": <OTRSAgentInterface value> }`, ready to spread into request headers. */
+	headers: { "X-OTRS-Header-SessionID": string }
+}
+
 /** Test seam. */
 export type Dependencies = { open: (options: { profileDir: string; headless: boolean }) => Promise<OpenBrowser>; signIn: typeof signInWithEntra }
 
 const DEFAULT_TIMEOUT_MS = 120_000
 const defaultDependencies: Dependencies = { open: openBrowser, signIn: signInWithEntra }
 
-/** Get the `OTRSAgentInterface` cookie of the OTRS agent interface. */
-export function getOtrsCookie(options: OtrsCookieOptions = {}): Promise<SessionCookie> {
+/** Get the `OTRSAgentInterface` cookie of the OTRS agent interface, with its value also as an `X-OTRS-Header-SessionID` header. */
+export async function getOtrsCookie(options: OtrsCookieOptions = {}, dependencies: Dependencies = defaultDependencies): Promise<OtrsSessionCookie> {
 	const env = options.env ?? process.env
-	return getCookie(otrsTarget(options.url ?? env.OTRS_URL ?? DEFAULT_OTRS_URL), options)
+	const cookie = await getCookie(otrsTarget(options.url ?? env.OTRS_URL ?? DEFAULT_OTRS_URL), options, dependencies)
+	return { ...cookie, headers: { "X-OTRS-Header-SessionID": cookie.value } }
 }
 
 /** Get the `OpenScapeUC` cookie of the OpenScape UC web client. */

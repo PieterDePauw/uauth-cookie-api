@@ -1,7 +1,7 @@
 import type { BrowserContext, Page } from "patchright"
 import { describe, expect, it, vi } from "vitest"
 import { CookieTimeoutError, MissingCredentialsError } from "./errors.js"
-import { getCookie, resolveEntraCredentials, runExclusive, waitForSsoBounce, type Dependencies } from "./get-cookie.js"
+import { getCookie, getOtrsCookie, resolveEntraCredentials, runExclusive, waitForSsoBounce, type Dependencies } from "./get-cookie.js"
 import { otrsTarget } from "./targets.js"
 
 const OTRS = "https://otrsdict.ugent.be/znuny/index.pl"
@@ -86,6 +86,14 @@ describe("getCookie", () => {
 		}
 		const cookie = await getCookie(target, { env: {}, profileDir: "p5", timeoutMs: 0 }, { open: fake.open, signIn: vi.fn() } as Dependencies)
 		expect(cookie.name).toBe("OpenScapeUC")
+	})
+})
+
+describe("getOtrsCookie", () => {
+	it("adds the cookie value as an X-OTRS-Header-SessionID header", async () => {
+		const fake = createFakeBrowser({ urlsAfterGoto: [OTRS], cookies: [otrsCookie] })
+		const cookie = await getOtrsCookie({ env: {}, profileDir: "p6" }, { open: fake.open, signIn: vi.fn() } as Dependencies)
+		expect(cookie).toMatchObject({ name: "OTRSAgentInterface", value: "abc123", headers: { "X-OTRS-Header-SessionID": "abc123" } })
 	})
 })
 

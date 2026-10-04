@@ -30,6 +30,7 @@ import { getOtrsCookie, getUcCookie } from "uauth-cookie-api"
 
 const otrs = await getOtrsCookie()
 console.log(otrs.value) // the OTRSAgentInterface value
+console.log(otrs.headers) // { "X-OTRS-Header-SessionID": <the same value> }
 
 const uc = await getUcCookie()
 await fetch("https://uc.ugent.be/owc-servlets/rules", { headers: { cookie: uc.header } })
@@ -45,6 +46,8 @@ Both return a `SessionCookie`:
 | `httpOnly`, `secure`       | Its flags.                                                            |
 | `header`                   | `name=value`, ready for a `Cookie:` header.                           |
 | `signedIn`                 | `true` if this call had to sign in to Entra.                          |
+
+`getOtrsCookie` adds `headers: { "X-OTRS-Header-SessionID": <OTRSAgentInterface value> }`, so it can be spread into a request's headers: `fetch(url, { headers: { ...otrs.headers } })`.
 
 Options (all optional):
 
