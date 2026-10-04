@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.cookie-profile/
+.env
+coverage/
+*.tgz
