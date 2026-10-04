@@ -56,27 +56,35 @@ export type OtrsSessionCookie = SessionCookie & {
 /** Test seam. */
 export type Dependencies = { open: (options: { profileDir: string; headless: boolean }) => Promise<OpenBrowser>; signIn: typeof signInWithEntra }
 
-const DEFAULT_TIMEOUT_MS = 120_000
+export const DEFAULT_TIMEOUT_MS = 120_000
 const defaultDependencies: Dependencies = { open: openBrowser, signIn: signInWithEntra }
 
 /** Get the `OTRSAgentInterface` cookie of the OTRS agent interface, with its value also as an `X-OTRS-Header-SessionID` header. */
 export async function getOtrsCookie(options: OtrsCookieOptions = {}, dependencies: Dependencies = defaultDependencies): Promise<OtrsSessionCookie> {
 	const env = options.env ?? process.env
-	const cookie = await getCookie(otrsTarget(options.url ?? env.OTRS_URL ?? DEFAULT_OTRS_URL), options, dependencies)
+	return withOtrsHeaders(await getCookie(otrsTarget(options.url ?? env.OTRS_URL ?? DEFAULT_OTRS_URL), options, dependencies))
+}
+
+/** Add the header OTRS accepts the same session ID in. */
+export function withOtrsHeaders(cookie: SessionCookie): OtrsSessionCookie {
 	return { ...cookie, headers: { "X-OTRS-Header-SessionID": cookie.value } }
 }
 
 /** Get the `OpenScapeUC` cookie of the OpenScape UC web client. */
 export function getUcCookie(options: UcCookieOptions = {}): Promise<SessionCookie> {
 	const env = options.env ?? process.env
-	const uc = { username: options.uc?.username ?? env.UC_USERNAME, password: options.uc?.password ?? env.UC_PASSWORD }
-	return getCookie(ucTarget(uc, options.url ?? env.UC_URL ?? DEFAULT_UC_URL), options)
+	return getCookie(ucTarget(resolveUcCredentials(options.uc, env), options.url ?? env.UC_URL ?? DEFAULT_UC_URL), options)
+}
+
+/** UC credentials from options, then env, per field. */
+export function resolveUcCredentials(partial: PartialUcCredentials | undefined, env: Record<string, string | undefined>): PartialUcCredentials {
+	return { username: partial?.username ?? env.UC_USERNAME, password: partial?.password ?? env.UC_PASSWORD }
 }
 
 /** Land on `target.url` signed in (via Entra if needed), run the target's hook, and return its session cookie. */
 export function getCookie(target: Target, options: CookieOptions = {}, dependencies: Dependencies = defaultDependencies): Promise<SessionCookie> {
 	const env = options.env ?? process.env
-	const profileDir = options.profileDir ?? env.COOKIE_PROFILE_DIR ?? ".cookie-profile"
+	const profileDir = resolveProfileDir(options, env)
 	// One Chromium per profile at a time: a second launch on the same dir fails on the profile lock.
 	return runExclusive(profileDir, async () => {
 		const deadline = Date.now() + (options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
@@ -89,7 +97,12 @@ export function getCookie(target: Target, options: CookieOptions = {}, dependenc
 	})
 }
 
-async function readCookieSignedIn(browser: OpenBrowser, target: Target, credentials: () => EntraCredentials, deadline: number, signIn: Dependencies["signIn"]): Promise<SessionCookie> {
+export function resolveProfileDir(options: CookieOptions, env: Record<string, string | undefined>): string {
+	return options.profileDir ?? env.COOKIE_PROFILE_DIR ?? ".cookie-profile"
+}
+
+/** Navigate `page` to the target, sign in to Entra if it bounces there, run the target's hook and read the cookie. Also how the server keeps a session alive. */
+export async function readCookieSignedIn(browser: Pick<OpenBrowser, "page" | "context">, target: Target, credentials: () => EntraCredentials, deadline: number, signIn: Dependencies["signIn"]): Promise<SessionCookie> {
 	const { page, context } = browser
 	await goto(page, target.url, deadline)
 	let signedIn = false
@@ -103,6 +116,14 @@ async function readCookieSignedIn(browser: OpenBrowser, target: Target, credenti
 	await target.afterSso?.(page)
 	const cookie = await waitForCookie(context, page, target, deadline)
 	return { name: cookie.name, value: cookie.value, domain: cookie.domain, path: cookie.path, expires: cookie.expires > 0 ? cookie.expires : undefined, httpOnly: cookie.httpOnly, secure: cookie.secure, header: `${cookie.name}=${cookie.value}`, signedIn }
+}
+
+/** Render a cookie as its bare value, a `name=value` header pair or JSON. */
+export function formatCookie(cookie: SessionCookie, format: string): string {
+	if (format === "value") return cookie.value
+	if (format === "header") return cookie.header
+	if (format === "json") return JSON.stringify(cookie, null, 2)
+	throw new TypeError(`Unknown format "${format}" (value, header or json)`)
 }
 
 /** `page.goto` that tolerates the navigation being replaced by an SSO redirect (net::ERR_ABORTED). */

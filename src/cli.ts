@@ -3,7 +3,9 @@ import { realpathSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { parseArgs } from "node:util"
 import { CookieApiError, CredentialsRejectedError, MissingCredentialsError } from "./errors.js"
-import { getOtrsCookie, getUcCookie, type SessionCookie } from "./get-cookie.js"
+import { formatCookie, getOtrsCookie, getUcCookie } from "./get-cookie.js"
+
+export { formatCookie }
 
 const USAGE = `Usage: uauth-cookie <otrs|uc> [--format value|header|json] [--url URL] [--profile DIR] [--headful]
 
@@ -11,14 +13,6 @@ Prints the OTRSAgentInterface (otrs) or OpenScapeUC (uc) cookie on stdout.
 Credentials come from ENTRA_USERNAME, ENTRA_PASSWORD, ENTRA_TOTP_SECRET and, for uc, UC_USERNAME, UC_PASSWORD.
 
 Exit codes: 0 ok, 1 other error, 2 missing credentials, 3 credentials rejected, 4 cookie not obtained.`
-
-/** Render the cookie for stdout. */
-export function formatCookie(cookie: SessionCookie, format: string): string {
-	if (format === "value") return cookie.value
-	if (format === "header") return cookie.header
-	if (format === "json") return JSON.stringify(cookie, null, 2)
-	throw new TypeError(`Unknown --format "${format}" (value, header or json)`)
-}
 
 /** Map an error to the documented exit code. */
 export function getExitCode(error: unknown): number {

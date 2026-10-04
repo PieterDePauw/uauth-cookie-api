@@ -10,7 +10,7 @@ describe("formatCookie", () => {
 		expect(formatCookie(cookie, "value")).toBe("v")
 		expect(formatCookie(cookie, "header")).toBe("OpenScapeUC=v")
 		expect(JSON.parse(formatCookie(cookie, "json"))).toMatchObject({ name: "OpenScapeUC", value: "v" })
-		expect(() => formatCookie(cookie, "xml")).toThrow(/Unknown --format/)
+		expect(() => formatCookie(cookie, "xml")).toThrow(/Unknown format/)
 	})
 })
 
